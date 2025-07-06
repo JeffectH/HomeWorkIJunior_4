@@ -1,43 +1,38 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class Explosion
 {
-    private float _expousionRadius = 20f;
-    private float _expousionForce = 300f;
+    private const float BaseRadius = 20f;
+    private const float BaseForce = 300f;
 
-    public void Expode(Vector3 pointExplode)
+    public void Expode(Vector3 pointExplode, Vector3 cubeScale)
     {
-        foreach (Rigidbody explodableObjects in GetExplousionObjects(pointExplode))
+        float radius = GetRadius(cubeScale);
+        var objects = GetExplosionObjects(pointExplode, radius);
+
+        foreach (Rigidbody explodableObjects in objects)
         {
-            explodableObjects.AddExplosionForce(_expousionForce, pointExplode, _expousionRadius);
+            Vector3 direction = (explodableObjects.transform.position - pointExplode).normalized;
+            float distance = Vector3.Distance(explodableObjects.transform.position, pointExplode);
+            float force = Mathf.Max(0f, GetForce(distance, radius, cubeScale));
+            explodableObjects.AddForce(direction * force, ForceMode.Force);
         }
     }
 
-    private List<Rigidbody> GetExplousionObjects(Vector3 pointExplode)
-    {
-        var hits = Physics.OverlapSphere(pointExplode, _expousionRadius);
-
-        var cubes = new List<Rigidbody>();
-
-        foreach (Collider hit in hits)
-            if (hit.attachedRigidbody is not null)
-                cubes.Add(hit.attachedRigidbody);
-
-        return cubes;
-    }
-    
-    public void ExplodeForAllExcept(Vector3 pointExplode, Cube except, float radius, float force)
+    private List<Rigidbody> GetExplosionObjects(Vector3 pointExplode, float radius)
     {
         var hits = Physics.OverlapSphere(pointExplode, radius);
-        foreach (var hit in hits)
-        {
-            Rigidbody rb = hit.attachedRigidbody;
-            if (rb != null && rb.gameObject != except.gameObject)
-            {
-                rb.AddExplosionForce(force, pointExplode, radius);
-            }
-        }
+        return hits.Where(hit => hit.attachedRigidbody != null).Select(hit => hit.attachedRigidbody).ToList();
     }
 
+    private float GetForce(float distance, float radius, Vector3 cubeScale)
+    {
+        float normalizedDistance = distance / GetRadius(cubeScale);
+        return BaseForce / cubeScale.x * (1f - normalizedDistance);
+    }
+
+    private float GetRadius(Vector3 cubeScale)
+        => BaseRadius / cubeScale.x;
 }
